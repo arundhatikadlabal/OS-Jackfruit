@@ -1,66 +1,48 @@
 /*
- * io_pulse.c - I/O-oriented workload for scheduler experiments.
- *
- * Usage:
- *   /io_pulse [iterations] [sleep_ms]
- *
- * The program writes small bursts to a file and sleeps between them.
- * This gives students an easy I/O-heavy workload to compare with
- * cpu_hog when discussing responsiveness and scheduler behavior.
- *
- * If you copy this binary into an Alpine rootfs, make sure it is built in a
- * format that can run there.
+ * io_pulse.c - I/O-bound workload for scheduling experiments
+ * Repeatedly writes and reads a temp file to generate I/O pressure.
  */
-
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
-#define DEFAULT_OUTPUT "/tmp/io_pulse.out"
-
-static unsigned int parse_uint(const char *arg, unsigned int fallback)
-{
-    char *end = NULL;
-    unsigned long value = strtoul(arg, &end, 10);
-
-    if (!arg || *arg == '\0' || (end && *end != '\0') || value == 0)
-        return fallback;
-    return (unsigned int)value;
-}
+#define BUF_SIZE  (64 * 1024)   /* 64 KB */
+#define ITERS     200
 
 int main(int argc, char *argv[])
 {
-    const unsigned int iterations = (argc > 1) ? parse_uint(argv[1], 20) : 20;
-    const unsigned int sleep_ms = (argc > 2) ? parse_uint(argv[2], 200) : 200;
-    int fd;
-    unsigned int i;
+    int duration = argc > 1 ? atoi(argv[1]) : 10;
+    time_t start = time(NULL);
+    char buf[BUF_SIZE];
+    memset(buf, 'A', sizeof(buf));
+    int cycle = 0;
 
-    fd = open(DEFAULT_OUTPUT, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (fd < 0) {
-        perror("open");
-        return 1;
-    }
-
-    for (i = 0; i < iterations; i++) {
-        char line[128];
-        int len = snprintf(line, sizeof(line), "io_pulse iteration=%u\n", i + 1);
-
-        if (write(fd, line, (size_t)len) != len) {
-            perror("write");
-            close(fd);
+    while ((int)(time(NULL) - start) < duration) {
+        FILE *f = tmpfile();
+        if (!f) {
+            perror("tmpfile");
             return 1;
         }
+        /* Write */
+        for (int i = 0; i < ITERS; i++)
+            fwrite(buf, 1, BUF_SIZE, f);
 
-        fsync(fd);
-        printf("io_pulse wrote iteration=%u\n", i + 1);
+        /* Read back */
+        rewind(f);
+        size_t total = 0;
+        size_t n;
+        while ((n = fread(buf, 1, BUF_SIZE, f)) > 0)
+            total += n;
+
+        fclose(f);
+        cycle++;
+        printf("io_pulse cycle=%d bytes_read=%zu elapsed=%ds\n",
+               cycle, total, (int)(time(NULL) - start));
         fflush(stdout);
-        usleep(sleep_ms * 1000U);
     }
 
-    close(fd);
+    printf("io_pulse done cycles=%d\n", cycle);
     return 0;
 }
