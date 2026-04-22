@@ -25,6 +25,7 @@
 #define LOG_DIR "logs"
 #define LOG_CHUNK_SIZE 4096
 #define LOG_BUFFER_CAPACITY 16
+//check buffer
 
 typedef enum {
     CMD_SUPERVISOR = 0,
