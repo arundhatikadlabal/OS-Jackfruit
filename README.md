@@ -1,4 +1,4 @@
-# OS Jackfruit – Lightweight Container Runtime
+# OS-Jackfruit – Lightweight Container Runtime
 
 ## Team Information
 
